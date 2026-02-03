@@ -27,10 +27,10 @@ def get_crawler_keywords(user_input):
     要求：
     1. 只需要输出一个JSON格式的字符串列表，无其他解释说明及Markdown标记和代码块符号；
     2. 关键词需要覆盖核心词、长尾词，同时包含相关正面、负面情绪词，维度全面且贴合社交媒体生活化搜索场景；
-    3. 关键词数量控制在10-15个之间，以英文逗号分隔，需围绕核心主题，确保覆盖用户需求的多个维度。
-    4. 关键词应简洁明了，避免使用复杂或冗长的表达。
+    3. 关键词数量控制在10-15个之间，以英文逗号分隔，不要使用单引号，使用空格表示且连接词；
+    4. 关键词应简洁明了，避免使用复杂或冗长的表达，需围绕核心主题，确保覆盖用户需求的多个维度。
     示例输出：
-    温江 臭味;温江 空气质量差;温江 空气清新；温江区 环境改善
+    温江 臭味,温江 空气质量差,温江 空气清新,温江区 环境改善
     """
 
     try:
@@ -46,9 +46,6 @@ def get_crawler_keywords(user_input):
         # 获取AI的回复
         result_text = completion.choices[0].message.content.strip()
         
-        # 清理可能残留的markdown符号（以防万一）
-        result_text = result_text.replace("```json", "").replace("```", "")
-        
         # 将字符串转为Python列表
         keywords = json.loads(result_text)
         return keywords
@@ -60,16 +57,15 @@ def get_crawler_keywords(user_input):
 # --- 测试运行 ---
 if __name__ == "__main__":
     # 模拟用户输入
-    requirement = "我想查一下最近一年温江区房屋中介的情况，进行舆情分析，请帮我生成一些适合在社交媒体平台搜索的关键词。"
+    requirement = "我想查一下最近一年温江区大气污染的情况，进行舆情分析，请帮我生成一些适合在社交媒体平台搜索的关键词。"
     
     # 调用函数
     keywords = get_crawler_keywords(requirement)
     
     print("-" * 30)
     print("用户需求:", requirement)
-    print("豆包生成的爬虫关键词:", keywords)
-    print(\n)
-    print("请复制关键词至base_config.py的KEYWORDS配置项中使用")
+    print("豆包生成的爬虫关键词: \n" + ", ".join(keywords))
+    print("\n请复制关键词至base_config.py的KEYWORDS配置项中使用")
     print("-" * 30)
     
  
