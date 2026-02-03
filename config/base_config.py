@@ -19,7 +19,11 @@
 
 # 基础配置
 PLATFORM = "xhs"  # 平台，xhs | dy | ks | bili | wb | tieba | zhihu
+
 KEYWORDS = "温江 大气污染"  # 关键词搜索配置，以英文逗号分隔
+# 豆包AI生成关键词列表功能（可选）
+# 终端输入“cd agent”，“uv run python3 doubao_get_keywords.py”，即可利用豆包生成关键词列表，将生成的关键词复制到此处使用。
+
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (

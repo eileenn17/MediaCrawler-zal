@@ -68,6 +68,7 @@ if __name__ == "__main__":
     print("-" * 30)
     print("用户需求:", requirement)
     print("豆包生成的爬虫关键词:", keywords)
+    print(\n)
     print("请复制关键词至base_config.py的KEYWORDS配置项中使用")
     print("-" * 30)
     
