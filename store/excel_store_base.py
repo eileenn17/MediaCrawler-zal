@@ -354,24 +354,44 @@ class ExcelStoreBase(AbstractStore):
             if self.dynamics_sheet is not None:
                 self._auto_adjust_column_width(self.dynamics_sheet)
 
-            # Remove empty sheets (only header row)
-            if self.contents_sheet.max_row == 1:
-                self.workbook.remove(self.contents_sheet)
-            if self.comments_sheet.max_row == 1:
-                self.workbook.remove(self.comments_sheet)
-            if self.creators_sheet.max_row == 1:
-                self.workbook.remove(self.creators_sheet)
-            if self.contacts_sheet is not None and self.contacts_sheet.max_row == 1:
-                self.workbook.remove(self.contacts_sheet)
-            if self.dynamics_sheet is not None and self.dynamics_sheet.max_row == 1:
-                self.workbook.remove(self.dynamics_sheet)
+            # Check if there are any data rows (excluding header row) in any sheet
+            has_data = (
+                self.contents_sheet.max_row > 1 or
+                self.comments_sheet.max_row > 1 or
+                self.creators_sheet.max_row > 1 or
+                (self.contacts_sheet is not None and self.contacts_sheet.max_row > 1) or
+                (self.dynamics_sheet is not None and self.dynamics_sheet.max_row > 1)
+            )
 
-            # Check if there are any sheets left
-            if len(self.workbook.sheetnames) == 0:
-                utils.logger.info(f"[ExcelStoreBase] No data to save, skipping file creation: {self.filename}")
-                return
+            if not has_data:
+                # Even if no data rows exist, keep the sheets with headers for reference
+                utils.logger.info(f"[ExcelStoreBase] No data rows found, but keeping sheets with headers: {self.filename}")
+            else:
+                # Remove empty sheets (only header row) only if there are other sheets with data
+                sheets_to_remove = []
+                if self.contents_sheet.max_row == 1:
+                    sheets_to_remove.append(('contents', self.contents_sheet))
+                if self.comments_sheet.max_row == 1:
+                    sheets_to_remove.append(('comments', self.comments_sheet))
+                if self.creators_sheet.max_row == 1:
+                    sheets_to_remove.append(('creators', self.creators_sheet))
+                if self.contacts_sheet is not None and self.contacts_sheet.max_row == 1:
+                    sheets_to_remove.append(('contacts', self.contacts_sheet))
+                if self.dynamics_sheet is not None and self.dynamics_sheet.max_row == 1:
+                    sheets_to_remove.append(('dynamics', self.dynamics_sheet))
 
-            # Save workbook
+                # Only remove empty sheets if there are other sheets with data
+                if sheets_to_remove and len([sheet for sheet in [self.contents_sheet, self.comments_sheet, self.creators_sheet,
+                                                                 self.contacts_sheet, self.dynamics_sheet]
+                                             if sheet is not None and sheet.max_row > 1]) > 0:
+                    for sheet_name, sheet in sheets_to_remove:
+                        self.workbook.remove(sheet)
+                        utils.logger.info(f"[ExcelStoreBase] Removed empty {sheet_name} sheet")
+                elif sheets_to_remove and not has_data:
+                    # If no data in any sheets, keep all sheets with headers
+                    utils.logger.info(f"[ExcelStoreBase] No data in any sheets, keeping all sheets with headers")
+
+            # Save workbook regardless of whether there's data
             self.workbook.save(self.filename)
             utils.logger.info(f"[ExcelStoreBase] Excel file saved successfully: {self.filename}")
 

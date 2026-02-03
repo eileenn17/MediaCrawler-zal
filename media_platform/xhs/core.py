@@ -22,6 +22,7 @@ import os
 import random
 from asyncio import Task
 from typing import Dict, List, Optional
+from datetime import datetime
 
 from playwright.async_api import (
     BrowserContext,
@@ -126,15 +127,25 @@ class XiaoHongShuCrawler(AbstractCrawler):
         """Search for notes and retrieve their comment information."""
         utils.logger.info("[XiaoHongShuCrawler.search] Begin search Xiaohongshu keywords")
         xhs_limit_count = 20  # Xiaohongshu limit page fixed value
-        if config.CRAWLER_MAX_NOTES_COUNT < xhs_limit_count:
-            config.CRAWLER_MAX_NOTES_COUNT = xhs_limit_count
+        # 如果设置为0，则爬取所有满足时间条件的帖子；否则按设置的数量爬取
+        max_notes_count = config.CRAWLER_MAX_NOTES_COUNT if config.CRAWLER_MAX_NOTES_COUNT > 0 else float('inf')
         start_page = config.START_PAGE
         for keyword in config.KEYWORDS.split(","):
             source_keyword_var.set(keyword)
             utils.logger.info(f"[XiaoHongShuCrawler.search] Current search keyword: {keyword}")
             page = 1
             search_id = get_search_id()
-            while (page - start_page + 1) * xhs_limit_count <= config.CRAWLER_MAX_NOTES_COUNT:
+            crawled_count = 0  # 已爬取的帖子数量
+
+            # 检查是否启用了时间筛选
+            enable_time_filter = getattr(config, 'ENABLE_TIME_FILTER', False)
+            start_date = getattr(config, 'START_DATE', '')
+            end_date = getattr(config, 'END_DATE', '')
+
+            # 用于跟踪是否已超出时间范围
+            time_range_exceeded = False
+
+            while not time_range_exceeded and crawled_count < max_notes_count:
                 if page < start_page:
                     utils.logger.info(f"[XiaoHongShuCrawler.search] Skip page {page}")
                     page += 1
@@ -144,16 +155,42 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     utils.logger.info(f"[XiaoHongShuCrawler.search] search Xiaohongshu keyword: {keyword}, page: {page}")
                     note_ids: List[str] = []
                     xsec_tokens: List[str] = []
+
+                    # 不管是否启用时间筛选，都发送相同请求（因为小红书API可能不支持时间参数）
                     notes_res = await self.xhs_client.get_note_by_keyword(
                         keyword=keyword,
                         search_id=search_id,
                         page=page,
                         sort=(SearchSortType(config.SORT_TYPE) if config.SORT_TYPE != "" else SearchSortType.GENERAL),
                     )
+
                     utils.logger.info(f"[XiaoHongShuCrawler.search] Search notes response: {notes_res}")
                     if not notes_res or not notes_res.get("has_more", False):
                         utils.logger.info("[XiaoHongShuCrawler.search] No more content!")
                         break
+
+                    # 检查返回的笔记是否在时间范围内
+                    time_check_failed = False
+                    if enable_time_filter and notes_res.get("items"):
+                        for post_item in notes_res.get("items", {}):
+                            if post_item.get("model_type") in ("rec_query", "hot_query"):
+                                continue
+
+                            # 获取笔记发布时间
+                            note_time = post_item.get("note_card", {}).get("time")
+                            if note_time and start_date:
+                                # 将毫秒时间戳转换为日期
+                                note_date = datetime.fromtimestamp(note_time / 1000).strftime('%Y-%m-%d')
+                                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                                note_dt = datetime.strptime(note_date, '%Y-%m-%d')
+
+                                # 如果笔记时间早于起始时间，则认为已超出时间范围
+                                if note_dt < start_dt:
+                                    utils.logger.info(f"[XiaoHongShuCrawler.search] Note time {note_date} is before start date {start_date}, stopping search.")
+                                    time_range_exceeded = True
+                                    time_check_failed = True
+                                    break
+
                     semaphore = asyncio.Semaphore(config.MAX_CONCURRENCY_NUM)
                     task_list = [
                         self.get_note_detail_async_task(
@@ -164,19 +201,64 @@ class XiaoHongShuCrawler(AbstractCrawler):
                         ) for post_item in notes_res.get("items", {}) if post_item.get("model_type") not in ("rec_query", "hot_query")
                     ]
                     note_details = await asyncio.gather(*task_list)
+
+                    # 过滤有效笔记并更新计数（应用严格的时间筛选）
+                    valid_note_details = []
                     for note_detail in note_details:
                         if note_detail:
-                            await xhs_store.update_xhs_note(note_detail)
-                            await self.get_notice_media(note_detail)
-                            note_ids.append(note_detail.get("note_id"))
-                            xsec_tokens.append(note_detail.get("xsec_token"))
+                            # 检查笔记是否符合时间筛选条件
+                            should_skip = False
+                            if enable_time_filter:
+                                note_time = note_detail.get("time")
+                                if note_time and start_date:
+                                    # 将毫秒时间戳转换为日期
+                                    note_date = datetime.fromtimestamp(note_time / 1000).strftime('%Y-%m-%d')
+                                    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                                    note_dt = datetime.strptime(note_date, '%Y-%m-%d')
+
+                                    # 检查是否在时间范围内
+                                    if note_dt < start_dt:
+                                        utils.logger.info(f"[XiaoHongShuCrawler.search] Note time {note_date} is before start date {start_date}, skipping this note.")
+                                        should_skip = True
+                                    elif end_date and end_date.strip() != "":
+                                        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                                        if note_dt > end_dt:
+                                            utils.logger.info(f"[XiaoHongShuCrawler.search] Note time {note_date} is after end date {end_date}, skipping this note.")
+                                            should_skip = True
+
+                                    # 如果当前笔记时间早于起始时间，且我们按最新排序，说明后面不会有符合时间的笔记了
+                                    if note_dt < start_dt and config.SORT_TYPE == "time_descending":
+                                        utils.logger.info(f"[XiaoHongShuCrawler.search] Found note before start date with latest sort, stopping search.")
+                                        time_range_exceeded = True
+
+                            # 只有符合时间条件的笔记才被存储和计数
+                            if not should_skip and crawled_count < max_notes_count:
+                                await xhs_store.update_xhs_note(note_detail)
+                                await self.get_notice_media(note_detail)
+                                note_ids.append(note_detail.get("note_id"))
+                                xsec_tokens.append(note_detail.get("xsec_token"))
+                                valid_note_details.append(note_detail)
+                                crawled_count += 1
+                            elif should_skip:
+                                # 如果笔记不符合时间条件，但还没有超出时间范围，继续处理其他笔记
+                                continue
+
                     page += 1
-                    utils.logger.info(f"[XiaoHongShuCrawler.search] Note details: {note_details}")
+                    utils.logger.info(f"[XiaoHongShuCrawler.search] Note details: {valid_note_details}, Total crawled: {crawled_count}")
                     await self.batch_get_note_comments(note_ids, xsec_tokens)
 
                     # Sleep after each page navigation
                     await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
                     utils.logger.info(f"[XiaoHongShuCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after page {page-1}")
+
+                    # 如果已超出时间范围或已达到最大数量，停止搜索
+                    if time_range_exceeded or crawled_count >= max_notes_count:
+                        if time_range_exceeded:
+                            utils.logger.info("[XiaoHongShuCrawler.search] Time range exceeded, stopping search.")
+                        if crawled_count >= max_notes_count:
+                            utils.logger.info(f"[XiaoHongShuCrawler.search] Reached max notes count ({max_notes_count}), stopping search.")
+                        break
+
                 except DataFetchError:
                     utils.logger.error("[XiaoHongShuCrawler.search] Get note detail error")
                     break

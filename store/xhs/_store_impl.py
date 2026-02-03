@@ -131,6 +131,7 @@ class XhsDbStoreImplement(AbstractStore):
             desc=content_item.get("desc"),
             video_url=content_item.get("video_url"),
             time=content_item.get("time"),
+            publish_date=content_item.get("publish_date", ""),  # 新增：发布日期
             last_update_time=content_item.get("last_update_time"),
             liked_count=str(content_item.get("liked_count")),
             collected_count=str(content_item.get("collected_count")),
@@ -154,6 +155,7 @@ class XhsDbStoreImplement(AbstractStore):
             "comment_count": str(content_item.get("comment_count")),
             "share_count": str(content_item.get("share_count")),
             "last_update_time": content_item.get("last_update_time"),
+            "publish_date": content_item.get("publish_date", ""),  # 新增：更新发布日期
         }
         stmt = update(XhsNote).where(XhsNote.note_id == note_id).values(**update_data)
         await session.execute(stmt)

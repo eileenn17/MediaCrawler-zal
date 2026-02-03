@@ -22,6 +22,7 @@
 # @Time    : 2024/1/14 17:34
 # @Desc    :
 from typing import List
+from datetime import datetime
 
 import config
 from var import source_keyword_var
@@ -83,6 +84,26 @@ def get_video_url_arr(note_item: Dict) -> List:
     return videoArr
 
 
+def convert_timestamp_to_date(timestamp: int) -> str:
+    """
+    Convert millisecond timestamp to YYYY-MM-DD format
+    Args:
+        timestamp: Millisecond timestamp
+
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    if not timestamp:
+        return ""
+    try:
+        # Convert millisecond timestamp to datetime
+        dt = datetime.fromtimestamp(timestamp / 1000)
+        return dt.strftime('%Y-%m-%d')
+    except Exception as e:
+        utils.logger.error(f"[store.xhs.convert_timestamp_to_date] Error converting timestamp {timestamp}: {e}")
+        return ""
+
+
 async def update_xhs_note(note_item: Dict):
     """
     Update Xiaohongshu note
@@ -104,13 +125,17 @@ async def update_xhs_note(note_item: Dict):
 
     video_url = ','.join(get_video_url_arr(note_item))
 
+    # Convert timestamp to YYYY-MM-DD format
+    publish_date = convert_timestamp_to_date(note_item.get("time"))
+
     local_db_item = {
         "note_id": note_item.get("note_id"),  # Note ID
         "type": note_item.get("type"),  # Note type
         "title": note_item.get("title") or note_item.get("desc", "")[:255],  # Note title
         "desc": note_item.get("desc", ""),  # Note description
         "video_url": video_url,  # Note video url
-        "time": note_item.get("time"),  # Note publish time
+        "time": note_item.get("time"),  # Note publish time (millisecond timestamp)
+        "publish_date": publish_date,  # Note publish date in YYYY-MM-DD format
         "last_update_time": note_item.get("last_update_time", 0),  # Note last update time
         "user_id": user_info.get("user_id"),  # User ID
         "nickname": user_info.get("nickname"),  # User nickname

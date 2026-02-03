@@ -19,7 +19,7 @@
 
 # 基础配置
 PLATFORM = "xhs"  # 平台，xhs | dy | ks | bili | wb | tieba | zhihu
-KEYWORDS = "温江 大气污染;温江区 雾霾;温江 空气质量;温江 空气污染;温江 PM2.5"  # 关键词搜索配置，以英文逗号分隔
+KEYWORDS = "温江 大气污染"  # 关键词搜索配置，以英文逗号分隔
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (
@@ -80,7 +80,7 @@ USER_DATA_DIR = "%s_user_data_dir"  # %s will be replaced by platform name
 START_PAGE = 1
 
 # 爬取视频/帖子的数量控制
-CRAWLER_MAX_NOTES_COUNT = 15
+CRAWLER_MAX_NOTES_COUNT = 10
 
 # 并发爬虫数量控制
 MAX_CONCURRENCY_NUM = 1
@@ -89,7 +89,7 @@ MAX_CONCURRENCY_NUM = 1
 ENABLE_GET_MEIDAS = False
 
 # 是否开启爬评论模式, 默认开启爬评论
-ENABLE_GET_COMMENTS = True
+ENABLE_GET_COMMENTS = False
 
 # 爬取一级评论的数量控制(单视频/帖子)
 CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES = 10

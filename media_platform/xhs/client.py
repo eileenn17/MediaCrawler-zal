@@ -271,6 +271,7 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
             "sort": sort.value,
             "note_type": note_type.value,
         }
+
         return await self.post(uri, data)
 
     async def get_note_by_id(

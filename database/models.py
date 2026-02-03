@@ -297,6 +297,7 @@ class XhsNote(Base):
     desc = Column(Text)
     video_url = Column(Text)
     time = Column(BigInteger, index=True)
+    publish_date = Column(String(20), index=True)  # 新增：发布日期，格式为YYYY-MM-DD
     last_update_time = Column(BigInteger)
     liked_count = Column(Text)
     collected_count = Column(Text)

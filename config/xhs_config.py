@@ -21,7 +21,12 @@
 # 小红书平台配置
 
 # 排序方式，具体的枚举值在media_platform/xhs/field.py中
-SORT_TYPE = "popularity_descending"
+SORT_TYPE = "time_descending"  # 改为最新发布排序
+
+# 时间筛选配置
+START_DATE = "2026-02-01"  # 开始日期，格式：YYYY-MM-DD
+END_DATE = ""  # 结束日期，留空表示不限制结束时间，格式：YYYY-MM-DD
+ENABLE_TIME_FILTER = True  # 是否启用时间筛选功能
 
 # 指定笔记URL列表, 必须要携带xsec_token参数
 XHS_SPECIFIED_NOTE_URL_LIST = [
